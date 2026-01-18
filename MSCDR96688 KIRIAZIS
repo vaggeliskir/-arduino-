@@ -1,0 +1,187 @@
+#include <Servo.h>
+
+const int trigPin = 6;       // Ultrasonic Trig pin
+const int echoPin = 7;       // Ultrasonic Echo pin
+const int motorLeft1 = 4;    // L293D IN1 (Left motor direction)
+const int motorLeft2 = 5;    // L293D IN2 (Left motor direction)
+const int motorRight1 = 8;   // L293D IN3 (Right motor direction)
+const int motorRight2 = 9;   // L293D IN4 (Right motor direction)
+const int ENA = 3;           // L293D ENA (PWM for left motor speed)
+const int ENB = 10;          // L293D ENB (PWM for right motor speed)
+const int servoPin = 11;     // Servo signal pin
+const int redLEDPin = 12;    // Red LED for left motor
+const int greenLEDPin = 13;  // Green LED for right motor
+
+
+// Servo motor
+Servo myServo;
+
+// Variables
+long distance = 0;
+
+void setup() {
+  // Initialize motor control pins as OUTPUT
+  pinMode(motorLeft1, OUTPUT);
+  pinMode(motorLeft2, OUTPUT);
+  pinMode(motorRight1, OUTPUT);
+  pinMode(motorRight2, OUTPUT);
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+
+  // LED pins
+pinMode(redLEDPin, OUTPUT);
+pinMode(greenLEDPin, OUTPUT);
+
+  // Initialize ultrasonic sensor pins
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  // Attach the servo motor
+  myServo.attach(servoPin);
+  myServo.write(90); // Center position
+
+ 
+
+  // Begin serial communication (optional for debugging)
+  Serial.begin(9600);
+}
+
+void loop() {
+  // Measure distance using the ultrasonic sensor
+  distance = measureDistance();
+
+ if (distance < 20) { // Obstacle detected
+    Serial.println("Obstacle detected. Avoiding...");
+    stopMotors();
+    avoidObstacle();
+  } else {
+    Serial.println("Path clear. Moving forward.");
+    moveForward(200); // Move forward at speed 200
+    delay(500);
+  }
+}
+
+// Movement functions
+void moveForward(int speed) {
+  analogWrite(ENA, 255);  // Set left motor speed
+  analogWrite(ENB, 255);  // Set right motor speed
+  digitalWrite(motorLeft1, HIGH);
+  digitalWrite(motorLeft2, LOW);
+  digitalWrite(motorRight1, HIGH);
+  digitalWrite(motorRight2, LOW);
+
+  // Turn LEDs ON during backward movement
+  digitalWrite(redLEDPin, HIGH );
+  digitalWrite(greenLEDPin, HIGH);
+}
+
+void moveBackward(int speed) {
+  analogWrite(ENA, 255);
+  analogWrite(ENB, 255);
+  digitalWrite(motorLeft1, LOW);
+  digitalWrite(motorLeft2, HIGH);
+  digitalWrite(motorRight1, LOW);
+  digitalWrite(motorRight2, HIGH);
+
+  // Turn LEDs OFF during backward movement
+  digitalWrite(redLEDPin, LOW);
+  digitalWrite(greenLEDPin, LOW);
+}
+
+void turnLeft(int speed) {
+  analogWrite(ENA, 100); // Slow left motor
+  analogWrite(ENB, 255);     // Full speed for right motor
+  digitalWrite(motorLeft1, LOW);
+  digitalWrite(motorLeft2, HIGH);
+  digitalWrite(motorRight1, HIGH);
+  digitalWrite(motorRight2, LOW);
+
+  // LED states
+  digitalWrite(redLEDPin, HIGH);   // Left motor reduced
+  digitalWrite(greenLEDPin, LOW); // Right motor active
+
+}
+
+void turnRight(int speed) {
+  analogWrite(ENA, 255);     // Full speed for left motor
+  analogWrite(ENB, 100); // Slow right motor
+  digitalWrite(motorLeft1, HIGH);
+  digitalWrite(motorLeft2, LOW);
+  digitalWrite(motorRight1, LOW);
+  digitalWrite(motorRight2, HIGH);
+
+   // LED states
+  digitalWrite(redLEDPin, LOW);  // Left motor active
+  digitalWrite(greenLEDPin, HIGH); // Right motor reduced
+}
+
+void stopMotors() {
+  analogWrite(ENA, 0); // Stop left motor
+  analogWrite(ENB, 0); // Stop right motor
+  digitalWrite(motorLeft1, LOW);
+  digitalWrite(motorLeft2, LOW);
+  digitalWrite(motorRight1, LOW);
+  digitalWrite(motorRight2, LOW);
+
+Serial.println("Motors stopped.");
+
+    // Turn LEDs OFF
+  digitalWrite(redLEDPin, LOW);
+  digitalWrite(greenLEDPin, LOW);
+}
+
+// Avoid obstacle
+void avoidObstacle() {
+  
+ Serial.println("Moving backward to avoid obstacle.");
+  stopMotors();
+   moveBackward(150);
+  delay(350);
+  stopMotors();
+  // Scan left and right
+  int leftDistance, rightDistance;
+
+  Serial.println("Scanning left.");
+  myServo.write(0); // Look left
+  delay(500);
+  leftDistance = measureDistance();
+  Serial.print("Left distance: ");
+  Serial.println(leftDistance);
+
+  Serial.println("Scanning right.");
+  myServo.write(180); // Look right
+  delay(500);
+  rightDistance = measureDistance();
+  Serial.print("Right distance: ");
+  Serial.println(rightDistance);
+
+  myServo.write(90); // Center servo
+  delay(500);
+
+  // Decide direction
+  if (leftDistance > rightDistance) {
+    Serial.println("Turning left.");
+    turnLeft(200);
+  } else {
+    Serial.println("Turning right.");
+    turnRight(200);
+  }
+
+  delay(500);
+  Serial.println("Resuming forward motion.");
+  moveForward(200);
+}
+
+
+// Measure distance using the ultrasonic sensor
+long measureDistance() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH);
+  long distance = duration * 0.034 / 2; // Convert to cm
+  return distance;
+}
